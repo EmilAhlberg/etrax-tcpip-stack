@@ -3,6 +3,9 @@ vendor/boot/start.c
 src/app/init.cc
 
 src/app/frontpanel.cc
+src/net/ethernet.cc
+src/net/llc.cc
+src/net/inpacket.cc
 
 vendor/system/system.c
 vendor/system/xprintf.c
@@ -23,5 +26,3 @@ vendor/memory/sp_alloc.c
 
 vendor/streams/iostream.cc
 vendor/streams/strstream.cc
-
-
