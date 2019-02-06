@@ -43,7 +43,7 @@ class EthernetAddress
   // Constructor: set myAddress
   EthernetAddress(byte *theAddress);
 
-  void writeTo(byte* theData);
+  void writeTo(byte* theData) const;
   // Copy myAddress to theData
 
   enum { length = 6 };
@@ -80,6 +80,9 @@ class Ethernet
   // Returns the only instance of Ethernet
   const EthernetAddress& myAddress();
   // Ethernet address of this server
+
+  const EthernetAddress& broadcastAddress();
+  // 0xFFFFFFFFFFFF
 
   bool getReceiveBuffer();
   // returns 'true' if a packet was found in the receive buffer.
@@ -127,6 +130,10 @@ class Ethernet
 
   EthernetAddress* myEthernetAddress;
   // The ethernet address of this server
+
+  EthernetAddress* ethBroadcastAddress;
+  // 0xFFFFFFFFFFFF
+
 
   byte  nextRxPage;
   // Next received buffer to be read. Always runs between 0..rxBufferPages-1

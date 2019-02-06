@@ -4,8 +4,13 @@ src/app/init.cc
 
 src/app/frontpanel.cc
 src/net/ethernet.cc
+src/net/arp.cc
+src/net/icmp.cc
+src/net/ip.cc
+src/net/ipaddr.cc
 src/net/llc.cc
 src/net/inpacket.cc
+
 
 vendor/system/system.c
 vendor/system/xprintf.c

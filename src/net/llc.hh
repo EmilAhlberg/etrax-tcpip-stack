@@ -2,7 +2,7 @@
 *!
 *! FILE NAME  : llc.hh
 *! 
-*! DESCRIPTION: LLC dummy
+*! DESCRIPTION: LLC layer
 *! 
 *!***************************************************************************/
 
@@ -22,9 +22,9 @@
 *%
 *% BASE CLASSES : InPacket
 *%
-*% CLASS TYPE   : 
-*%
-*% DESCRIPTION  : Decode a LLC packet.
+*% DESCRIPTION  : Decode a LLC packet. Only Ethernet encapsulation is used.
+*%                Detects IP and ARP packets, creates and decodes IPInPackets
+*%                and ARPInPackets respectively.
 *%
 *% SUBCLASSING  : None.
 *%
@@ -38,16 +38,17 @@ class LLCInPacket : public InPacket
               EthernetAddress theDestinationAddress,
               EthernetAddress theSourceAddress,
               uword           theTypeLen);
-  // Ethernet must provide the ethernet information
   void decode();
-  // Will identify and answer to ICMP ECHO (ping) packets to this server
   void answer(byte* theData, udword theLength);
   uword headerOffset();
-  
+
  private:
   EthernetAddress myDestinationAddress;
+  // Destination address extracted from the packet
   EthernetAddress mySourceAddress;
+  // Source address extracted from the packet
   uword           myTypeLen;
+  // Type/Length extracted from the packet and byte reordered
 };
 
 #endif

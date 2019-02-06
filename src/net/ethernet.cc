@@ -44,7 +44,8 @@ static bool isInitialized = FALSE;
 
 //----------------------------------------------------------------------------
 //
-Ethernet::Ethernet() : myEthernetAddress(new EthernetAddress(0, 0x95, 0x05, 0x31,0x28 ,0x93))
+Ethernet::Ethernet() : myEthernetAddress(new EthernetAddress(0, 0x95, 0x05, 0x31,0x28 ,0x93)),
+                ethBroadcastAddress(new EthernetAddress(0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF))
 {
   trace << "Ethernet created." << endl;
   nextRxPage = 0;
@@ -52,7 +53,7 @@ Ethernet::Ethernet() : myEthernetAddress(new EthernetAddress(0, 0x95, 0x05, 0x31
   processingPacket = FALSE;
   this->initMemory();
   this->initEtrax();
-  cout << "My node address is " << this->myAddress() << endl;
+  //cout << "My node address is " << this->myAddress() << endl;
   isInitialized = TRUE;
 }
 
@@ -72,6 +73,13 @@ Ethernet::myAddress()
 {
   return *myEthernetAddress;
 }
+
+const EthernetAddress&
+Ethernet::broadcastAddress()
+{
+  return *ethBroadcastAddress;
+}
+
 
 //----------------------------------------------------------------------------
 //
@@ -617,9 +625,15 @@ void EthernetInPacket::answer(byte* theData, udword theLength) {
   destPointer[13] = ((byte*)&myTypeLen)[0];
   // Swap type length bytes for some reason (little endian?)
   mySourceAddress.writeTo(destPointer); //
-  myDestinationAddress.writeTo(destPointer+EthernetAddress::length);
-
+  if (myDestinationAddress == Ethernet::instance().broadcastAddress()) {
+     Ethernet::instance().myAddress().writeTo(destPointer+EthernetAddress::length);
+     //If broadcasted ARP request (to our IP), set correct ethernet source address.
+  }
+  else {
+    myDestinationAddress.writeTo(destPointer+EthernetAddress::length);
+  }
   Ethernet::instance().transmittPacket(destPointer, theLength+Ethernet::ethernetHeaderLength);
+
   delete myData; // deletes array wrappedPacket created in decodeReceivedPacket
   //??? May refer to data1, which is NOT an object on the heap
   delete destPointer; // deletes array created in LLCInPacket
@@ -676,7 +690,7 @@ EthernetAddress::operator == (const EthernetAddress& theAddress) const
 //----------------------------------------------------------------------------
 //
 void
-EthernetAddress::writeTo(byte* theData)
+EthernetAddress::writeTo(byte* theData) const
 {
   for (int i = 0; i < length; i++)
   {
