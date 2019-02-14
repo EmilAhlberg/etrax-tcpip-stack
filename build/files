@@ -10,7 +10,7 @@ src/net/ip.cc
 src/net/ipaddr.cc
 src/net/llc.cc
 src/net/inpacket.cc
-
+src/net/tcp.cc
 
 vendor/system/system.c
 vendor/system/xprintf.c

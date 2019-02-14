@@ -1,9 +1,9 @@
 /*!***************************************************************************
 *!
 *! FILE NAME  : llc.hh
-*! 
+*!
 *! DESCRIPTION: LLC layer
-*! 
+*!
 *!***************************************************************************/
 
 #ifndef llc_hh
@@ -41,6 +41,7 @@ class LLCInPacket : public InPacket
   void decode();
   void answer(byte* theData, udword theLength);
   uword headerOffset();
+  InPacket* copyAnswerChain();
 
  private:
   EthernetAddress myDestinationAddress;
@@ -53,4 +54,3 @@ class LLCInPacket : public InPacket
 
 #endif
 /****************** END OF FILE llc.hh *************************************/
-

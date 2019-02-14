@@ -25,6 +25,7 @@ extern "C" {
 #include "frontpanel.hh"
 #include "ethernet.hh"
 #include "llc.hh"
+#include "tcp.hh"
 
 #define D_INIT
 #ifdef D_INIT
@@ -71,6 +72,8 @@ thread_main(void)
   initJob();
   FrontPanel::instance();
   Ethernet::instance();
+  TCP::instance();
+  //Init IP???
 
   while (1)
   {

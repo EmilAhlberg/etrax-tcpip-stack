@@ -77,6 +77,14 @@ LLCInPacket::answer(byte *theData, udword theLength)
   myFrame->answer(theData, theLength);
 }
 
+InPacket*
+LLCInPacket::copyAnswerChain()
+{
+  LLCInPacket* anAnswerPacket = new LLCInPacket(*this);
+  anAnswerPacket->setNewFrame(myFrame->copyAnswerChain());
+  return anAnswerPacket;
+}
+
 uword
 LLCInPacket::headerOffset()
 {

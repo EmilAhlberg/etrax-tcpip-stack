@@ -1,9 +1,9 @@
 /*!***************************************************************************
 *!
 *! FILE NAME  : ip.hh
-*! 
+*!
 *! DESCRIPTION: IP, Internet protocol
-*! 
+*!
 *!***************************************************************************/
 
 #ifndef ip_hh
@@ -51,7 +51,7 @@ class IP
 *%
 *% BASE CLASSES : InPacket
 *%
-*% CLASS TYPE   : 
+*% CLASS TYPE   :
 *%
 *% DESCRIPTION  : Decode an IP packet. Detects ICMP and TCP packets, to this
 *%                server. Creates and decodes ICMPInPackets
@@ -69,11 +69,13 @@ class IPInPacket : public InPacket
   void decode();
   void answer(byte* theData, udword theLength);
   uword headerOffset();
-
+  InPacket* copyAnswerChain();
  private:
   // Things extracted from the packet used in answer:
   byte      myProtocol;
   IPAddress mySourceIPAddress;
+  byte  myTOS;
+  uword myIdentification;
 };
 
 /*****************************************************************************
@@ -82,7 +84,7 @@ class IPInPacket : public InPacket
 *%
 *% BASE CLASSES : none
 *%
-*% CLASS TYPE   : 
+*% CLASS TYPE   :
 *%
 *% DESCRIPTION  : Describes the fields of an IP packet.
 *%
@@ -108,4 +110,3 @@ class IPHeader
 
 #endif
 /****************** END OF FILE ip.hh *************************************/
-

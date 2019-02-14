@@ -527,7 +527,7 @@ Ethernet::transmittPacket(byte *theData, udword theLength)
   // for(int i = 0; i < 252; i++) {
   //   cout << hex << (int)aPage->data[i] << ":";
   // }
-  // while(true) {}
+  //while(true) {}
 
   /* Now we can tell Etrax to send this packet. Unless it is already      */
   /* busy sending packets. In which case it will send this automatically  */
@@ -637,6 +637,14 @@ void EthernetInPacket::answer(byte* theData, udword theLength) {
   delete myData; // deletes array wrappedPacket created in decodeReceivedPacket
   //??? May refer to data1, which is NOT an object on the heap
   delete destPointer; // deletes array created in LLCInPacket
+}
+
+InPacket*
+EthernetInPacket::copyAnswerChain()
+{
+  EthernetInPacket* anAnswerPacket = new EthernetInPacket(*this);
+  anAnswerPacket->setNewFrame(NULL);
+  return anAnswerPacket;
 }
 
 uword EthernetInPacket::headerOffset() { return Ethernet::ethernetHeaderLength; }

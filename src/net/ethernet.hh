@@ -245,6 +245,8 @@ class EthernetInPacket : public InPacket
   uword headerOffset();
   // Return the length of the ethernet header,
   // see Ethernet::ethernetHeaderLength
+  InPacket* copyAnswerChain();
+
 
  private:
   EthernetAddress myDestinationAddress;
