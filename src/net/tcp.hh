@@ -14,6 +14,8 @@
 #include "inpacket.hh"
 #include "ipaddr.hh"
 #include "queue.hh"
+#include "tcpsocket.hh"
+#include "threads.hh"
 
 /****************** CLASS DEFINITION SECTION ********************************/
 
@@ -46,6 +48,12 @@ class TCP
                                   InPacket*  theCreator);
   // Create a new connection and insert it in the connection list
 
+  bool acceptConnection(uword portNo);
+  // Is true when a connection is accepted on port portNo.
+  void connectionEstablished(TCPConnection* theConnection);
+  // Create a new TCPSocket. Register it in TCPConnection.
+  // Create and start a SimpleApplication.
+
   void deleteConnection(TCPConnection*);
   // Removes a connection from the list and deletes it
 
@@ -72,6 +80,7 @@ class TCP
 *%***************************************************************************/
 class TCPState;
 class TCPSender;
+class retransmitTimer;
 class TCPConnection
 {
  public:
@@ -80,6 +89,11 @@ class TCPConnection
                 uword      theDestinationPort,
                 InPacket*  theCreator);
   ~TCPConnection();
+
+  uword serverPortNumber();
+  // Return myPort.
+  void  registerSocket(TCPSocket* theSocket);
+  // Set mySocket to theSocket.
 
   bool tryConnection(IPAddress& theSourceAddress,
                      uword      theSourcePort,
@@ -127,8 +141,34 @@ class TCPConnection
   // Data has been acknowledged up to this sequence number. What remains up to
   // sendNext is sent but not yet acked by the other host.
 
+  udword     sentMaxSeq;
+
   TCPSender* myTCPSender;
   TCPState*  myState;
+
+  retransmitTimer* myretransmitTimer;
+
+  //LAB 5:
+  bool softLock;
+
+  TCPSocket* mySocket;
+
+  byte* transmitQueue;
+  // a reference to the data to be sent,
+  udword queueLength;
+  //the number of data to be sent, and
+  udword firstSeq;
+  //the sequence number of the first byte in the queue.
+  udword theOffset;
+  //the first position in the queue relative the variable transmitQueue to send from ,
+  byte* theFirst;
+  //the first byte to send in the segment relative the variable transmitQueue,
+  udword theSendLength;
+  // the number of byte to send in a single segment.
+  udword myWindowSize;
+  // contains the offered window size from each segment.
+  udword lostPacketCounter;
+
 };
 
 /*****************************************************************************
@@ -240,6 +280,9 @@ class EstablishedState : public TCPState
  public:
   static EstablishedState* instance();
 
+  void AppClose(TCPConnection* theConnection);
+  // Handle 'q' command.
+
   void NetClose(TCPConnection* theConnection, udword theSynchronizationNumber);
   // Handle an incoming FIN segment
   void Receive(TCPConnection* theConnection,
@@ -310,6 +353,38 @@ class LastAckState : public TCPState
   LastAckState() {}
 };
 
+
+class FinWait1State : public TCPState
+{
+ public:
+  static FinWait1State* instance();
+
+  void Acknowledge(TCPConnection* theConnection,
+                   udword theAcknowledgementNumber);
+  // Handle incoming Acknowledgement
+
+ protected:
+  FinWait1State() {}
+};
+
+
+class FinWait2State : public TCPState
+{
+ public:
+  static FinWait2State* instance();
+
+  void NetClose(TCPConnection* theConnection, udword theSynchronizationNumber);
+  // Handle an incoming FIN segment
+
+ protected:
+  FinWait2State() {}
+};
+
+
+
+
+
+
 /*****************************************************************************
 *%
 *% CLASS NAME   : TCPSender
@@ -335,7 +410,9 @@ class TCPSender
   void sendData(byte*  theData,
                 udword theLength);
   // Send a data segment. PSH and ACK flags are set.
-
+  void sendFromQueue();
+  // maintain the queue and send smaller sets of data in segments
+  //until all data are acknowledged.
  private:
   TCPConnection* myConnection;
   InPacket*      myAnswerChain;
@@ -403,6 +480,23 @@ class TCPHeader
   uword  windowSize;
   uword  checksum;
   uword  urgentPointer;
+};
+
+class retransmitTimer : public Timed
+{
+ public:
+   retransmitTimer(TCPConnection* theConnection,
+                   Duration retransmitTime);
+   void start();
+   // this->timeOutAfter(myRetransmitTime);
+   void cancel();
+   // this->resetTimeOut();
+ private:
+   void timeOut();
+   // ...->sendNext = ...->sentUnAcked; ..->sendFromQueue();
+   TCPConnection* myConnection;
+   Duration myRetransmitTime;
+   // one second
 };
 
 /*****************************************************************************

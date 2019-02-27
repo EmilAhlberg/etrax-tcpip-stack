@@ -11,6 +11,7 @@ src/net/ipaddr.cc
 src/net/llc.cc
 src/net/inpacket.cc
 src/net/tcp.cc
+src/net/tcpsocket.cc
 
 vendor/system/system.c
 vendor/system/xprintf.c
