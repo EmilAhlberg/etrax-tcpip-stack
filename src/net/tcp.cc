@@ -23,6 +23,7 @@ extern "C"
 #include "ip.hh"
 #include "ethernet.hh"
 #include "tcpsocket.hh"
+#include "http.hh"
 
 
 //#define D_TCP
@@ -108,19 +109,26 @@ TCP::deleteConnection(TCPConnection* theConnection)
 //----------------------------------------------------------------------------
 // LAB 5!
 bool TCP::acceptConnection(uword portNo) {
-  return portNo == 7;
+  return portNo == 7 || portNo == 80;
 }
 
 void
 TCP::connectionEstablished(TCPConnection *theConnection)
 {
+
+  TCPSocket* aSocket = new TCPSocket(theConnection);
+  // Create a new TCPSocket.
+  theConnection->registerSocket(aSocket);
+  // Register the socket in the TCPConnection.
+
   if (theConnection->serverPortNumber() == 7)
   {
-    TCPSocket* aSocket = new TCPSocket(theConnection);
-    // Create a new TCPSocket.
-    theConnection->registerSocket(aSocket);
-    // Register the socket in the TCPConnection.
     Job::schedule(new SimpleApplication(aSocket));
+    // Create and start an application for the connection.
+  }
+  if (theConnection->serverPortNumber() == 80)
+  {
+    Job::schedule(new HTTPServer(aSocket));
     // Create and start an application for the connection.
   }
 }
@@ -146,6 +154,7 @@ TCPConnection::TCPConnection(IPAddress& theSourceAddress,
   myState = ListenState::instance();
   myretransmitTimer = new retransmitTimer(this, Clock::seconds);
   lostPacketCounter = 1;
+  softLock = false;
 }
 
 //----------------------------------------------------------------------------
@@ -153,6 +162,7 @@ TCPConnection::TCPConnection(IPAddress& theSourceAddress,
 TCPConnection::~TCPConnection()
 {
   trace << "TCP connection destroyed" << endl;
+  myretransmitTimer->cancel(); /// hmmm
   delete myTCPSender;
   delete myretransmitTimer;
   if (mySocket == NULL) {
@@ -277,9 +287,6 @@ void ListenState::Synchronize(TCPConnection* theConnection, udword theSynchroniz
     }
 }
 
-
-
-
 //----------------------------------------------------------------------------
 //
 SynRecvdState*
@@ -289,19 +296,14 @@ SynRecvdState::instance()
   return &myInstance;
 }
 
-
 void SynRecvdState::Acknowledge(TCPConnection* theConnection, udword theAcknowledgementNumber) {
   if (theConnection->sendNext == theAcknowledgementNumber) {
     theConnection->sentUnAcked = theAcknowledgementNumber;
     theConnection->myState =  EstablishedState::instance();
     TCP::instance().connectionEstablished(theConnection);
     //Create socket for theConnection
-    //cout << "Conn established" << endl;
   }
 }
-
-
-
 
 //----------------------------------------------------------------------------
 //
@@ -312,17 +314,16 @@ EstablishedState::instance()
   return &myInstance;
 }
 
-
 //----------------------------------------------------------------------------
 //
 void
 EstablishedState::NetClose(TCPConnection* theConnection, udword theSynchronizationNumber)
 {
   trace << "EstablishedState::NetClose" << endl;
-
+  //theConnection->myretransmitTimer->cancel();
 
   // Update connection variables and send an ACK
-  theConnection -> receiveNext = theSynchronizationNumber +1;
+  theConnection->receiveNext = theSynchronizationNumber +1;
   // ??? sequence check is bad?
   theConnection->myTCPSender->sendFlags(0x10);
 
@@ -338,7 +339,7 @@ EstablishedState::NetClose(TCPConnection* theConnection, udword theSynchronizati
   // Simulate application Close...
 
   theConnection->mySocket->socketEof();
-
+  theConnection->myretransmitTimer->cancel(); /// hmmm
   //theConnection->AppClose();
 }
 
@@ -350,20 +351,19 @@ EstablishedState::Receive(TCPConnection* theConnection,
                           byte*  theData,
                           udword theLength)
 {
-  trace << "EstablishedState::Receive" << endl;
+
+  bool isExpectedPacket = false;
 
   if (theSynchronizationNumber == theConnection->receiveNext) {
     theConnection->receiveNext = theSynchronizationNumber + theLength;
-    theConnection->myTCPSender->sendFlags(0x10);
+    isExpectedPacket = true;
   }
+  theConnection->myTCPSender->sendFlags(0x10);
 
-  if (theConnection->myPort == 7 ) {
+  if (theConnection->receiveNext != theSynchronizationNumber + theLength || isExpectedPacket) {
+
     theConnection->mySocket->socketDataReceived(theData, theLength);
-    // theConnection->Send(theData, theLength); //LAB 4 deprecated!
   }
-
-  // Delayed ACK is not implemented, simply acknowledge the data
-  // by sending an ACK segment, then echo the data using Send.
 }
 
 void EstablishedState::Acknowledge(TCPConnection* theConnection, udword theAcknowledgementNumber) {
@@ -372,7 +372,6 @@ void EstablishedState::Acknowledge(TCPConnection* theConnection, udword theAckno
         //cout << "ack update: " << theConnection->sentUnAcked <<  endl;
         if((theConnection->sentUnAcked - theConnection->firstSeq) == theConnection->queueLength) {
             // no more data in queue
-            //cout << endl << "Release socket!!" << endl;
 
             theConnection->myretransmitTimer->cancel();
             theConnection->mySocket->socketDataSent();
@@ -405,7 +404,8 @@ void EstablishedState::AppClose(TCPConnection* theConnection) {
   theConnection->myTCPSender->sendFlags(0x11);
   //send FIN ACK ???
   theConnection->sendNext += 1;
-  cout << "EstablishedState -> FinWait1State" <<endl;
+  //cout << "EstablishedState -> FinWait1State" <<endl;
+  theConnection->myretransmitTimer->cancel(); /// hmmm
 }
 
 
@@ -428,6 +428,7 @@ void CloseWaitState::AppClose(TCPConnection* theConnection) {
     theConnection->myTCPSender->sendFlags(0x11);
     //send FIN ACK
     theConnection->sendNext += 1;
+    theConnection->myretransmitTimer->cancel(); /// hmmm
     cout << "Connection closed" << endl;
 }
 
@@ -465,7 +466,7 @@ FinWait1State::instance()
 void FinWait1State::Acknowledge(TCPConnection* theConnection, udword theAcknowledgementNumber) {
     if (theConnection->sendNext == theAcknowledgementNumber) {
       theConnection->myState = FinWait2State::instance();
-      cout << "FinWait1State -> FinWait2State" << endl;
+      //cout << "FinWait1State -> FinWait2State" << endl;
     }
 }
 //----------------------------------------------------------------------------
@@ -484,6 +485,7 @@ void FinWait2State::NetClose(TCPConnection* theConnection, udword theSynchroniza
   theConnection->myTCPSender->sendFlags(0x10);
   //Send ACK
 
+  theConnection->myretransmitTimer->cancel(); /// hmmm
   theConnection->Kill();
   //No time wait state, kill instantly.
 }
@@ -495,6 +497,7 @@ void TCPState::Synchronize(TCPConnection* theConnection,
                         udword theSynchronizationNumber) { cout << "should not happen" << endl;}
 // Handle an incoming SYN segment
 void TCPState::NetClose(TCPConnection* theConnection, udword theSynchronizationNumber) {
+  theConnection->myretransmitTimer->cancel(); /// hmmm
   cout << "should not happen 1" << endl;}
 // Handle an incoming FIN segment
 void TCPState::AppClose(TCPConnection* theConnection) {
@@ -508,12 +511,12 @@ void TCPState::Receive(TCPConnection* theConnection,
 // Handle incoming data
 void TCPState::Acknowledge(TCPConnection* theConnection,
                         udword theAcknowledgementNumber) {
-                          cout <<  theAcknowledgementNumber<< "<-- ackNbr"<<endl;
-                          cout <<  HILO(theAcknowledgementNumber)<< "<-- ackNbr HILO"<<endl;
+                          //cout << "Port: " << theConnection->myPort << endl;
                           cout << "should not happen 4" << endl;}
 // Handle incoming Acknowledgement
 void TCPState::Send(TCPConnection* theConnection, byte*  theData, udword theLength) {
-  cout << "should not happen 5" << endl;}
+  cout << "should not happen 5" << endl;
+}
 
 
 //----------------------------------------------------------------------------
@@ -677,6 +680,9 @@ void TCPSender::sendFromQueue() {
     }
     myConnection->softLock=false;
   }
+  else {
+    cout << "Locked out of sendFromQueue! Port: " << myConnection->hisPort << endl;
+  }
 }
 
 void
@@ -759,8 +765,12 @@ void TCPInPacket::decode() {
   TCPConnection* tcpConnection = TCP::instance().getConnection(mySourceAddress, mySourcePort, myDestinationPort);
 
   tcpConnection->myWindowSize = HILO(tcpHeader->windowSize);
-  if (tcpConnection->myWindowSize > 25000) {
-    tcpConnection->myWindowSize = 25000;
+  if (myLength > TCP::tcpHeaderLength && (tcpHeader->flags & 0x8) == 0) {
+    tcpHeader->flags |= 0x8; //because POST behaves stupidly
+  }
+
+  if (tcpConnection->myWindowSize > 4000) {
+    tcpConnection->myWindowSize = 4000;
   }
   //cout  << HILO(tcpHeader->windowSize);
   //cout << " ?  " <<tcpConnection->myWindowSize<< endl;
@@ -776,7 +786,6 @@ void TCPInPacket::decode() {
       else
       {
         // State LISTEN. No SYN flag. Impossible to continue.'
-        cout << "inb4 chain" << endl;
         tcpConnection->Kill();
       }
     }
@@ -785,6 +794,7 @@ void TCPInPacket::decode() {
     // Connection was established.
 
       //CHECK FLAGS
+
       if ((tcpHeader->flags & 0x10) != 0 ) {
         // only ACK flag (0x10)
         tcpConnection->Acknowledge(myAcknowledgementNumber);
@@ -795,9 +805,15 @@ void TCPInPacket::decode() {
           tcpConnection->NetClose(mySequenceNumber);
       }
 
+
       if((tcpHeader->flags & 0x8) != 0 ) {
         tcpConnection->Receive(mySequenceNumber, myData+TCP::tcpHeaderLength,
                                 myLength - TCP::tcpHeaderLength);
+      }
+
+      if((tcpHeader->flags & 0x4) != 0 ) {
+        cout << "RESET: " << tcpConnection->myPort << endl;
+        tcpConnection->Kill();
       }
   }
 }

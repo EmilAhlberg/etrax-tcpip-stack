@@ -94,6 +94,7 @@ SimpleApplication::doit()
 TCPSocket::TCPSocket(TCPConnection* theConnection) : myConnection(theConnection) {
   myReadSemaphore = Semaphore::createQueueSemaphore("read", 0);
   myWriteSemaphore = Semaphore::createQueueSemaphore("write", 0);
+  eofFound = false;
 }
 
 TCPSocket::~TCPSocket() {
@@ -125,8 +126,13 @@ TCPSocket::socketDataReceived(byte* theData, udword theLength)
 void
 TCPSocket::Write(byte* theData, udword theLength)
 {
-  myConnection->Send(theData, theLength);
-  myWriteSemaphore->wait(); // Wait until the data is acknowledged
+  if(myConnection->myState == EstablishedState::instance()) {
+    myConnection->Send(theData, theLength);
+    myWriteSemaphore->wait(); // Wait until the data is acknowledged
+  }
+  else {
+    cout << "send from wrong state!" << endl;
+  }
 }
 
 void

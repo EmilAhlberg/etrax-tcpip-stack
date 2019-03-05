@@ -12,6 +12,8 @@ src/net/llc.cc
 src/net/inpacket.cc
 src/net/tcp.cc
 src/net/tcpsocket.cc
+src/net/http.cc
+src/app/fs.cc
 
 vendor/system/system.c
 vendor/system/xprintf.c
